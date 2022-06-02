@@ -41,6 +41,7 @@ use std::iter::FromIterator;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
+use graph::prelude::web3::types::U64;
 
 use crate::adapter::ProviderStatus;
 use crate::chain::BlockFinality;
@@ -64,6 +65,7 @@ pub struct EthereumAdapter {
     web3: Arc<Web3<Transport>>,
     metrics: Arc<ProviderEthRpcMetrics>,
     supports_eip_1898: bool,
+    start_block_num: U64,
 }
 
 /// Gas limit for `eth_call`. The value of 50_000_000 is a protocol-wide parameter so this
@@ -85,6 +87,7 @@ impl CheapClone for EthereumAdapter {
             web3: self.web3.cheap_clone(),
             metrics: self.metrics.cheap_clone(),
             supports_eip_1898: self.supports_eip_1898,
+            start_block_num: self.start_block_num.clone(),
         }
     }
 }
@@ -97,6 +100,7 @@ impl EthereumAdapter {
         transport: Transport,
         provider_metrics: Arc<ProviderEthRpcMetrics>,
         supports_eip_1898: bool,
+        start_block_num: u64,
     ) -> Self {
         // Unwrap: The transport was constructed with this url, so it is valid and has a host.
         let hostname = graph::url::Url::parse(url)
@@ -123,6 +127,7 @@ impl EthereumAdapter {
             web3,
             metrics: provider_metrics,
             supports_eip_1898: supports_eip_1898 && !is_ganache,
+            start_block_num: start_block_num.into(),
         }
     }
 
@@ -847,6 +852,7 @@ impl EthereumAdapterTrait for EthereumAdapter {
         let web3 = self.web3.clone();
         let metrics = self.metrics.clone();
         let provider = self.provider().to_string();
+        let start_block_number = self.start_block_num.clone();
         let gen_block_hash_future = retry("eth_getBlockByNumber(0, false) RPC call", &logger)
             .no_limit()
             .timeout_secs(30)
@@ -856,7 +862,7 @@ impl EthereumAdapterTrait for EthereumAdapter {
                 let provider = provider.clone();
                 async move {
                     web3.eth()
-                        .block(BlockId::Number(Web3BlockNumber::Number(0.into())))
+                        .block(BlockId::Number(Web3BlockNumber::Number(start_block_number)))
                         .await
                         .map_err(|e| {
                             metrics.set_status(ProviderStatus::GenesisFail, &provider);

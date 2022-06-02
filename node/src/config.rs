@@ -427,7 +427,7 @@ impl ChainSection {
                 let colon = arg.find(':').ok_or_else(|| {
                     return anyhow!(
                         "A network name must be provided alongside the \
-                         Ethereum node location. Try e.g. 'mainnet:URL'."
+                         Ethereum node location. Try e.g. 'mainnet::URL'."
                     );
                 })?;
 
@@ -443,7 +443,17 @@ impl ChainSection {
                 let colon = rest.find(':').ok_or_else(|| {
                     return anyhow!(
                         "A network name must be provided alongside the \
-                         Ethereum node location. Try e.g. 'mainnet:URL'."
+                         Ethereum node location. Try e.g. 'mainnet::URL'."
+                    )
+                })?;
+
+                let (start_block_number, rest) = rest.split_at(colon);
+                let rest = &rest[1..];
+
+                let colon = rest.find(':').ok_or_else(|| {
+                    return anyhow!(
+                        "A network name must be provided alongside the \
+                         Ethereum node location. Try e.g. 'mainnet::URL'."
                     );
                 })?;
 
@@ -461,6 +471,10 @@ impl ChainSection {
                         url: url.to_string(),
                         features,
                         headers: Default::default(),
+                        start_block_num: match start_block_number.parse() {
+                            Ok(n) => n,
+                            Err(_) => 0,
+                        },
                     }),
                 };
                 let entry = chains.entry(name.to_string()).or_insert_with(|| Chain {
@@ -563,6 +577,7 @@ pub struct Web3Provider {
         deserialize_with = "deserialize_http_headers"
     )]
     pub headers: HeaderMap,
+    pub start_block_num: u64,
 }
 
 impl Web3Provider {
@@ -731,6 +746,7 @@ impl<'de> Deserialize<'de> for Provider {
                         features: features
                             .ok_or_else(|| serde::de::Error::missing_field("features"))?,
                         headers: headers.unwrap_or_else(|| HeaderMap::new()),
+                        start_block_num: 0,
                     }),
                 };
 

@@ -392,6 +392,7 @@ async fn create_ethereum_networks(
                             transport,
                             eth_rpc_metrics.clone(),
                             supports_eip_1898,
+                            web3.start_block_num,
                         )
                         .await,
                     ),
